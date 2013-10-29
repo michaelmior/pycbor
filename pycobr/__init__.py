@@ -38,6 +38,16 @@ def encode(data):
             encoded += encode(value)
         return encoded
 
+    simple = {
+        False: 20,
+        True: 21,
+        None: 22,
+    }
+
+    if data is True or data is False or data is None:
+        encoded += bytes([(7 << 5) + simple[data]])
+        return encoded
+
     if isinstance(data, int):
         if data < 0:
             data = -1 - data
@@ -70,15 +80,6 @@ def encode(data):
         encoded += struct.pack('>d', data)
         return encoded
 
-    simple = {
-        False: 20,
-        True: 21,
-        None: 22,
-    }
-
-    if data in simple:
-        encoded += bytes([(7 << 5) + simple[data]])
-        return data
 
 def decode(data):
     pass
