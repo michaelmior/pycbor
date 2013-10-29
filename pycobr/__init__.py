@@ -65,5 +65,20 @@ def encode(data):
         encoded += b'\xff'
         return encoded
 
+    if isinstance(data, float):
+        encoded += bytes([(7 << 5) + 27])
+        encoded += struct.pack('>d', data)
+        return encoded
+
+    simple = {
+        False: 20,
+        True: 21,
+        None: 22,
+    }
+
+    if data in simple:
+        encoded += bytes([(7 << 5) + simple[data]])
+        return data
+
 def decode(data):
     pass
