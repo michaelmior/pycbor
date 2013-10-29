@@ -18,7 +18,7 @@ def _encode_int(data, major_type):
         encoded += struct.pack('>I', data)
     elif data < (2 << 63) - 1:
         encoded += bytes([(major_type << 5) + 27])
-        encoded += struct.pack('>L', data)
+        encoded += struct.pack('>Q', data)
 
     return encoded
 
@@ -32,7 +32,7 @@ def encode(data):
         return encoded
 
     if isinstance(data, dict):
-        encoded += _encode_int(len(data), 4)
+        encoded += _encode_int(len(data), 5)
         for key, value in data.items():
             encoded += encode(key)
             encoded += encode(value)
