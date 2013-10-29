@@ -5,7 +5,7 @@ import struct
 def _encode_int(data, major_type):
     encoded = b''
 
-    if 0 < data < 23:
+    if 0 <= data <= 23:
         encoded += bytes([(major_type << 5) + data])
     elif data < (2 << 7) - 1:
         encoded += bytes([(major_type << 5) + 24])
