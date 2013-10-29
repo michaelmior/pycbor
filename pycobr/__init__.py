@@ -81,5 +81,85 @@ def encode(data):
         return encoded
 
 
+def _decode_int(value, data):
+    if 0 <= value <= 23:
+        return (1, value)
+    elif value == 24:
+        return (2, struct.unpack('>B', data[:1])[0])
+    elif value == 25:
+        return (3, struct.unpack('>H', data[:2])[0])
+    elif value == 26:
+        return (4, struct.unpack('>I', data[:4])[0])
+    elif value == 27:
+        return (5, struct.unpack('>Q', data[:8])[0])
+
+
+def _decode_value(offset, data):
+    major_type = data[offset] >> 5
+    extra = data[offset] & ~(major_type << 5)
+    value = None
+
+    if major_type == 0:
+        offset_inc, value = _decode_int(extra, data[1 + offset:])
+        offset += offset_inc
+
+    if major_type == 1:
+        offset_inc, value = _decode_int(extra, data[1 + offset:])
+        offset += offset_inc
+        value = -1 - value
+
+    if major_type == 2:
+        offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+        offset += 1
+        value = data[offset:offset + value_len]
+        offset += offset_inc + value_len - 1
+
+    if major_type == 3:
+        offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+        offset += 1
+        value = data[offset:offset + value_len].decode('utf8')
+        offset += offset_inc + value_len - 1
+
+    if major_type == 4:
+        value = []
+        if extra == 31:
+            offset += 1
+            while data[offset] != 0xFF:
+                offset, item = _decode_value(offset, data)
+                value.append(item)
+        else:
+            offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+            offset += offset_inc
+            for i in range(0, value_len):
+                offset, item = _decode_value(offset, data)
+                value.append(item)
+
+    if major_type == 5:
+        offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+        offset += offset_inc
+        value = {}
+        for i in range(0, value_len):
+            offset, key = _decode_value(offset, data)
+            offset, item = _decode_value(offset, data)
+            value[key] = item
+
+    simple = {
+        20: False,
+        21: True,
+        22: None,
+    }
+
+    if major_type == 7:
+        if extra == 27:
+            value = struct.unpack('>d', data[offset:offset + 8])
+            offset += 8 + 1
+
+        if extra in simple:
+            value = simple[extra]
+            offset += 1
+
+    return (offset, value)
+
+
 def decode(data):
-    pass
+    return _decode_value(0, data)[1]
