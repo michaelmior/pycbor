@@ -19,6 +19,9 @@ def _encode_int(data, major_type):
     elif data < (2 << 63) - 1:
         encoded += bytes([(major_type << 5) + 27])
         encoded += struct.pack('>Q', data)
+    else:
+        # TODO Handle values in this range
+        raise ValueError
 
     return encoded
 
