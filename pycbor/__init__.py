@@ -138,21 +138,44 @@ def _decode_value(offset, data):
                 value.append(item)
 
     if major_type == 5:
-        offset_inc, value_len = _decode_int(extra, data[1 + offset:])
-        offset += offset_inc
         value = {}
-        for i in range(0, value_len):
-            offset, key = _decode_value(offset, data)
-            offset, item = _decode_value(offset, data)
-            value[key] = item
+        if extra == 31:
+            offset += 1
+            while data[offset] != 0xFF:
+                offset, key = _decode_value(offset, data)
+                offset, item = _decode_value(offset, data)
+                value[key] = item
+        else:
+            offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+            offset += offset_inc
+            for i in range(0, value_len):
+                offset, key = _decode_value(offset, data)
+                offset, item = _decode_value(offset, data)
+                value[key] = item
 
     simple = {
         20: False,
         21: True,
         22: None,
+        23: None, # decode 'undefined' (23) as 'null' (22)
     }
 
     if major_type == 7:
+        if extra == 25: # half-precision, code from rfc7049
+            from math import ldexp
+            half = struct.unpack('>H', data[:2])[0]
+            single = (half & 0x7fff) << 13 | (half & 0x8000) << 16
+            if ((half & 0x7c00) != 0x7c00):
+                value = ldexp(struct.unpack(">f", struct.pack(">I", single))[0], 112)
+            else:
+                single |= 0x7f800000
+                value = ldexp(struct.unpack(">f", struct.pack(">I", single))[0])
+            offset += 2 + 1
+
+        if extra == 26: # single-precision
+            value = struct.unpack('>f', data[offset:offset + 4])
+            offset += 4 + 1
+
         if extra == 27:
             value = struct.unpack('>d', data[offset:offset + 8])
             offset += 8 + 1

@@ -34,9 +34,12 @@ def get_diagnostics():
                 # Skip tests which can't be decoded as JSON
                 continue
 
-        # Skip tests with floats or out of range ints
-        if isinstance(diagnostic, float) or (isinstance(diagnostic, int) \
-                and abs(diagnostic) >= (2 << 63) - 1):
+        # Skip tests with floats
+        if isinstance(diagnostic, float):
+            pass#continue
+
+        # Skip tests with out of range ints
+        if (isinstance(diagnostic, int) and abs(diagnostic) >= (2 << 63) - 1):
             continue
 
         # Get the expected bytestring
@@ -45,6 +48,7 @@ def get_diagnostics():
                 for i in range(0, len(encoded), 2)))
 
         tests.append((diagnostic, encoded))
+        print("added test:", diagnostic, " - ", encoded)
 
     return tests
 
