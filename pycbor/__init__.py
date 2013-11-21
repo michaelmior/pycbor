@@ -1,6 +1,7 @@
 import collections
 import struct
-
+import math
+import array
 
 def _encode_int(data, major_type):
     encoded = b''
@@ -24,6 +25,34 @@ def _encode_int(data, major_type):
         raise ValueError
 
     return encoded
+
+
+def _encode_float(data):
+    encoded = b''
+
+    if data == 0.0:
+        if math.copysign(1.0, data) < 0: # -0.0
+            encoded += bytes([0xf9, 0x80, 0x00])
+        else: # 0.0
+            encoded += bytes([0xf9, 0x00, 0x00])
+    elif math.isinf(data):
+        if math.copysign(1.0, data) < 0:
+            encoded += bytes([0xf9, 0xfc, 0x00])
+        else:
+            encoded += bytes([0xf9, 0x7c, 0x00])
+    elif math.isnan(data):
+        encoded += bytes([0xf9, 0x7e, 0x00])
+    else:
+        float_array = array.array('f', [data])
+        if float_array[0] == data:
+            encoded += bytes([(7 << 5) + 26])
+            encoded += struct.pack('>f', float_array[0])
+        else:
+            encoded += bytes([(7 << 5) + 27])
+            encoded += struct.pack('>d', data)
+
+    return encoded
+
 
 def encode(data):
     encoded = b''
@@ -79,8 +108,7 @@ def encode(data):
         return encoded
 
     if isinstance(data, float):
-        encoded += bytes([(7 << 5) + 27])
-        encoded += struct.pack('>d', data)
+        encoded += _encode_float(data)
         return encoded
 
 
@@ -165,7 +193,7 @@ def _decode_value(offset, data):
             from math import ldexp
             half = struct.unpack('>H', data[:2])[0]
             single = (half & 0x7fff) << 13 | (half & 0x8000) << 16
-            if ((half & 0x7c00) != 0x7c00):
+            if (half & 0x7c00) != 0x7c00:
                 value = ldexp(struct.unpack(">f", struct.pack(">I", single))[0], 112)
             else:
                 single |= 0x7f800000
