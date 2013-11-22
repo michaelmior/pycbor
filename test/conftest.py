@@ -22,21 +22,22 @@ def get_diagnostics():
 
         # TODO Generate skipped tests for tests which are skipped
 
-        # Skip tests with hex, strings, undefined lengths, tags, or undefined
-        if diagnostic.startswith('h') or diagnostic.startswith('"\\u') \
-                or '_' in diagnostic or '(' in diagnostic \
-                or diagnostic == 'undefined':
+        # Skip tests with hex, strings with undefined lengths, tags
+        if diagnostic.startswith('h') or diagnostic.startswith('"\\u') :#\
+                #or '(' in diagnostic:
             continue
+        elif '(' in diagnostic:
+            if diagnostic.startswith('(_') and not '_ h' in diagnostic:
+                diagnostic = eval(diagnostic.replace('_', ' '))
+            else: # skip others with '('
+                continue
         else:
+            diagnostic = diagnostic.replace('_', ' ')
             try:
                 diagnostic = decoder.decode(diagnostic)
             except ValueError as e:
                 # Skip tests which can't be decoded as JSON
                 continue
-
-        # Skip tests with floats
-        if isinstance(diagnostic, float):
-            pass#continue
 
         # Skip tests with out of range ints
         if (isinstance(diagnostic, int) and abs(diagnostic) >= (2 << 63) - 1):

@@ -181,16 +181,32 @@ def _decode_value(offset, data):
         value = -1 - value
 
     if major_type == 2:
-        offset_inc, value_len = _decode_int(extra, data[1 + offset:])
-        offset += 1
-        value = data[offset:offset + value_len]
-        offset += offset_inc + value_len - 1
+        if extra == 31:
+            offset += 1
+            value = b''
+            while data[offset] != 0xFF:
+                offset, item = _decode_value(offset, data)
+                value += bytes(item)
+            offset += 1
+        else:
+            offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+            offset += 1
+            value = data[offset:offset + value_len]
+            offset += offset_inc + value_len - 1
 
     if major_type == 3:
-        offset_inc, value_len = _decode_int(extra, data[1 + offset:])
-        offset += 1
-        value = data[offset:offset + value_len].decode('utf8')
-        offset += offset_inc + value_len - 1
+        if extra == 31:
+            offset += 1
+            value = ''
+            while data[offset] != 0xFF:
+                offset, item = _decode_value(offset, data)
+                value += item
+            offset += 1
+        else:
+            offset_inc, value_len = _decode_int(extra, data[1 + offset:])
+            offset += 1
+            value = data[offset:offset + value_len].decode('utf8')
+            offset += offset_inc + value_len - 1
 
     if major_type == 4:
         value = []
@@ -199,6 +215,7 @@ def _decode_value(offset, data):
             while data[offset] != 0xFF:
                 offset, item = _decode_value(offset, data)
                 value.append(item)
+            offset += 1
         else:
             offset_inc, value_len = _decode_int(extra, data[1 + offset:])
             offset += offset_inc
@@ -214,6 +231,7 @@ def _decode_value(offset, data):
                 offset, key = _decode_value(offset, data)
                 offset, item = _decode_value(offset, data)
                 value[key] = item
+            offset += 1
         else:
             offset_inc, value_len = _decode_int(extra, data[1 + offset:])
             offset += offset_inc
