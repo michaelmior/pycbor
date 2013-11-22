@@ -27,6 +27,39 @@ def _encode_int(data, major_type):
     return encoded
 
 
+def _single_to_half(single):
+    f = struct.unpack(">I", struct.pack(">f", single))[0]
+    h = ((f >> 16) & 0x8000) | ((((f & 0x7f800000) - 0x38000000) >> 13) & 0x7c00) | ((f >> 13) & 0x03ff)
+    return h
+
+
+def _half_to_float_UNUSED(half):
+    # half is 16-bit int
+    exp = (half >> 10) & 0x1f
+    mant = half & 0x3ff
+    if exp == 0:
+        val = math.ldexp(mant, -24)
+    elif exp != 31:
+        val = math.ldexp(mant + 1024, exp - 25)
+    elif mant == 0:
+        val = float('inf')
+    else:
+        val = float('nan')
+    if half & 0x8000:
+        val = -val
+    return val
+
+
+def _half_to_float(half):
+    # half is 16-bit int
+    half = 0 + half
+    single = (half & 0x7fff) << 13 | (half & 0x8000) << 16
+    if (half & 0x7c00) != 0x7c00:
+        return math.ldexp(struct.unpack(">f", struct.pack(">I", single))[0], 112)
+    single |= 0x7f800000
+    return struct.unpack(">f", struct.pack(">I", single))[0]
+
+
 def _encode_float(data):
     encoded = b''
 
@@ -43,10 +76,15 @@ def _encode_float(data):
     elif math.isnan(data):
         encoded += bytes([0xf9, 0x7e, 0x00])
     else:
-        float_array = array.array('f', [data])
-        if float_array[0] == data:
-            encoded += bytes([(7 << 5) + 26])
-            encoded += struct.pack('>f', float_array[0])
+        single_array = array.array('f', [data])
+        if single_array[0] == data:
+            half = _single_to_half(single_array[0])
+            if _half_to_float(half) == single_array[0]:
+                encoded += bytes([(7 << 5) + 25])
+                encoded += struct.pack('>H', half)
+            else:
+                encoded += bytes([(7 << 5) + 26])
+                encoded += struct.pack('>f', single_array[0])
         else:
             encoded += bytes([(7 << 5) + 27])
             encoded += struct.pack('>d', data)
@@ -189,27 +227,21 @@ def _decode_value(offset, data):
     }
 
     if major_type == 7:
-        if extra == 25: # half-precision, code from rfc7049
-            from math import ldexp
-            half = struct.unpack('>H', data[:2])[0]
-            single = (half & 0x7fff) << 13 | (half & 0x8000) << 16
-            if (half & 0x7c00) != 0x7c00:
-                value = ldexp(struct.unpack(">f", struct.pack(">I", single))[0], 112)
-            else:
-                single |= 0x7f800000
-                value = ldexp(struct.unpack(">f", struct.pack(">I", single))[0])
-            offset += 2 + 1
-
-        if extra == 26: # single-precision
-            value = struct.unpack('>f', data[offset:offset + 4])
-            offset += 4 + 1
-
-        if extra == 27:
-            value = struct.unpack('>d', data[offset:offset + 8])
-            offset += 8 + 1
-
-        if extra in simple:
+        offset += 1
+        if extra == 25: # half-precision
+            half = struct.unpack('>H', data[offset:offset + 2])[0]
+            value = _half_to_float(half)
+            offset += 2
+        elif extra == 26: # single-precision
+            value = struct.unpack('>f', data[offset:offset + 4])[0]
+            offset += 4
+        elif extra == 27:
+            value = struct.unpack('>d', data[offset:offset + 8])[0]
+            offset += 8
+        elif extra in simple:
             value = simple[extra]
+        elif extra == 24:
+            value = int(data[offset])
             offset += 1
 
     return (offset, value)
