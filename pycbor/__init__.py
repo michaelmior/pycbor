@@ -29,32 +29,33 @@ def _encode_int(data, major_type):
 
 def _single_to_half(single):
     f = struct.unpack(">I", struct.pack(">f", single))[0]
+    if f < 0x38800000: # subnormal
+        # thanx to http://stackoverflow.com/questions/6162651/half-precision-floating-point-in-java
+        if f < 0x33000000: # too small for subnormal
+            return math.copysign(single, 0.0)
+        val = (f & 0x7fffffff ) >> 23 # tmp exp for subnormal calc
+        sign = (f >> 16) & 0x8000
+        return sign | ((f & 0x7fffff | 0x800000) # add subnormal bit
+                        + (0x800000 >> val - 102) # round depending on cut off
+                        >> 126 - val) # div by 2^(1-(exp-127+15)) and >> 13 | exp=0
     h = ((f >> 16) & 0x8000) | ((((f & 0x7f800000) - 0x38000000) >> 13) & 0x7c00) | ((f >> 13) & 0x03ff)
     return h
 
 
-def _half_to_float_UNUSED(half):
-    # half is 16-bit int
-    exp = (half >> 10) & 0x1f
-    mant = half & 0x3ff
-    if exp == 0:
-        val = math.ldexp(mant, -24)
-    elif exp != 31:
-        val = math.ldexp(mant + 1024, exp - 25)
-    elif mant == 0:
-        val = float('inf')
-    else:
-        val = float('nan')
-    if half & 0x8000:
-        val = -val
-    return val
-
-
 def _half_to_float(half):
     # half is 16-bit int
-    half = 0 + half
     single = (half & 0x7fff) << 13 | (half & 0x8000) << 16
     if (half & 0x7c00) != 0x7c00:
+        mant = half & 0x03ff
+        exp = half & 0x7c00
+        if mant and exp == 0:
+            exp = 0x1c400
+            while (mant & 0x400) == 0:
+                mant <<= 1
+                exp -= 0x400
+            mant &= 0x3ff
+            single = (half & 0x8000) << 16 | (exp | mant) << 13
+            return struct.unpack(">f", struct.pack(">I", single))[0]
         return math.ldexp(struct.unpack(">f", struct.pack(">I", single))[0], 112)
     single |= 0x7f800000
     return struct.unpack(">f", struct.pack(">I", single))[0]
@@ -65,27 +66,29 @@ def _encode_float(data):
 
     if data == 0.0:
         if math.copysign(1.0, data) < 0: # -0.0
-            encoded += bytes([0xf9, 0x80, 0x00])
+            encoded += b'\xf9\x80\x00'
         else: # 0.0
-            encoded += bytes([0xf9, 0x00, 0x00])
+            encoded += b'\xf9\x00\x00'
     elif math.isinf(data):
         if math.copysign(1.0, data) < 0:
-            encoded += bytes([0xf9, 0xfc, 0x00])
+            encoded += b'\xf9\xfc\x00'
         else:
-            encoded += bytes([0xf9, 0x7c, 0x00])
+            encoded += b'\xf9\x7c\x00'
     elif math.isnan(data):
-        encoded += bytes([0xf9, 0x7e, 0x00])
+        encoded += b'\xf9\x7e\x00'
     else:
         single_array = array.array('f', [data])
         if single_array[0] == data:
             half = _single_to_half(single_array[0])
-            if _half_to_float(half) == single_array[0]:
+            if _half_to_float(half) == single_array[0]: # half-precision
                 encoded += bytes([(7 << 5) + 25])
                 encoded += struct.pack('>H', half)
-            else:
+            else: # single-precision
+                print('half:', bin(half), hex(half), 'single:', single_array[0], sep=' ')
+                print('s2h: ', _half_to_float(half), 'single:', single_array[0], sep=' ')
                 encoded += bytes([(7 << 5) + 26])
                 encoded += struct.pack('>f', single_array[0])
-        else:
+        else: # double-precision
             encoded += bytes([(7 << 5) + 27])
             encoded += struct.pack('>d', data)
 
