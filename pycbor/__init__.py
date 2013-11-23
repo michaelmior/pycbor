@@ -28,46 +28,64 @@ def _encode_int(data, major_type):
 
 
 def _single_to_half(single):
-    f = struct.unpack(">I", struct.pack(">f", single))[0]
-    if f < 0x38800000: # subnormal
-        # thanx to http://stackoverflow.com/questions/6162651/half-precision-floating-point-in-java
-        if f < 0x33000000: # too small for subnormal
+    f = struct.unpack('>I', struct.pack('>f', single))[0]
+
+    # http://stackoverflow.com/questions/6162651/
+    # Check if float is subnormal
+    if f < 0x38800000:
+        # Too small for subnormal, must use +/- 0.0
+        if f < 0x33000000:
             return math.copysign(single, 0.0)
-        val = (f & 0x7fffffff ) >> 23 # tmp exp for subnormal calc
+
+        # Get sign bit and temporary exponent
         sign = (f >> 16) & 0x8000
-        return sign | ((f & 0x7fffff | 0x800000) # add subnormal bit
-                        + (0x800000 >> val - 102) # round depending on cut off
+        val = (f & 0x7fffffff ) >> 23
+
+        # Add the subnormal bit, round, divde by 2^(1-(exp-127+15))
+        # and >> 13 | exp=0
+        return sign | ((f & 0x7fffff | 0x800000)
+                        + (0x800000 >> val - 102)
                         >> 126 - val) # div by 2^(1-(exp-127+15)) and >> 13 | exp=0
-    h = ((f >> 16) & 0x8000) | ((((f & 0x7f800000) - 0x38000000) >> 13) & 0x7c00) | ((f >> 13) & 0x03ff)
-    return h
+    else:
+        # XXX What's going on here?
+        return ((f >> 16) & 0x8000) | \
+                ((((f & 0x7f800000) - 0x38000000) >> 13) & 0x7c00) | \
+                ((f >> 13) & 0x03ff)
 
 
 def _half_to_float(half):
-    # half is 16-bit int
+    # Half is 16-bit int
     single = (half & 0x7fff) << 13 | (half & 0x8000) << 16
     if (half & 0x7c00) != 0x7c00:
         mant = half & 0x03ff
         exp = half & 0x7c00
         if mant and exp == 0:
             exp = 0x1c400
+
             while (mant & 0x400) == 0:
                 mant <<= 1
                 exp -= 0x400
+
             mant &= 0x3ff
             single = (half & 0x8000) << 16 | (exp | mant) << 13
-            return struct.unpack(">f", struct.pack(">I", single))[0]
-        return math.ldexp(struct.unpack(">f", struct.pack(">I", single))[0], 112)
+
+            return struct.unpack('>f', struct.pack('>I', single))[0]
+
+        return math.ldexp(struct.unpack('>f', struct.pack('>I', single))[0], 112)
+
     single |= 0x7f800000
-    return struct.unpack(">f", struct.pack(">I", single))[0]
+    return struct.unpack('>f', struct.pack('>I', single))[0]
 
 
 def _encode_float(data):
     encoded = b''
 
     if data == 0.0:
-        if math.copysign(1.0, data) < 0: # -0.0
+        if math.copysign(1.0, data) < 0:
+            # -0.0
             encoded += b'\xf9\x80\x00'
-        else: # 0.0
+        else:
+            # 0.0
             encoded += b'\xf9\x00\x00'
     elif math.isinf(data):
         if math.copysign(1.0, data) < 0:
@@ -80,13 +98,17 @@ def _encode_float(data):
         single_array = array.array('f', [data])
         if single_array[0] == data:
             half = _single_to_half(single_array[0])
-            if _half_to_float(half) == single_array[0]: # half-precision
+
+            if _half_to_float(half) == single_array[0]:
+                # Half-precision
                 encoded += bytes([(7 << 5) + 25])
                 encoded += struct.pack('>H', half)
-            else: # single-precision
+            else:
+                # Single-precision
                 encoded += bytes([(7 << 5) + 26])
                 encoded += struct.pack('>f', single_array[0])
-        else: # double-precision
+        else:
+            # Double-precision
             encoded += bytes([(7 << 5) + 27])
             encoded += struct.pack('>d', data)
 
@@ -247,11 +269,14 @@ def _decode_value(offset, data):
 
     if major_type == 7:
         offset += 1
-        if extra == 25: # half-precision
+
+        if extra == 25:
+            # Half-precision
             half = struct.unpack('>H', data[offset:offset + 2])[0]
             value = _half_to_float(half)
             offset += 2
-        elif extra == 26: # single-precision
+        elif extra == 26:
+            # Single-precision
             value = struct.unpack('>f', data[offset:offset + 4])[0]
             offset += 4
         elif extra == 27:

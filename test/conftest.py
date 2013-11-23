@@ -23,8 +23,7 @@ def get_diagnostics():
         # TODO Generate skipped tests for tests which are skipped
 
         # Skip tests with hex, strings with undefined lengths, tags
-        if diagnostic.startswith('h') or diagnostic.startswith('"\\u') :#\
-                #or '(' in diagnostic:
+        if diagnostic.startswith('h') or diagnostic.startswith('"\\u'):
             continue
         elif '(' in diagnostic:
             if diagnostic.startswith('(_') and not '_ h' in diagnostic:
