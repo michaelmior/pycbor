@@ -49,7 +49,6 @@ def get_diagnostics():
                 for i in range(0, len(encoded), 2)))
 
         tests.append((diagnostic, encoded))
-        print("added test:", diagnostic, " - ", encoded)
 
     return tests
 

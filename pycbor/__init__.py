@@ -84,8 +84,6 @@ def _encode_float(data):
                 encoded += bytes([(7 << 5) + 25])
                 encoded += struct.pack('>H', half)
             else: # single-precision
-                print('half:', bin(half), hex(half), 'single:', single_array[0], sep=' ')
-                print('s2h: ', _half_to_float(half), 'single:', single_array[0], sep=' ')
                 encoded += bytes([(7 << 5) + 26])
                 encoded += struct.pack('>f', single_array[0])
         else: # double-precision
