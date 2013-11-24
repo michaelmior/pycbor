@@ -47,7 +47,12 @@ def _single_to_half(single):
                         + (0x800000 >> val - 102)
                         >> 126 - val) # div by 2^(1-(exp-127+15)) and >> 13 | exp=0
     else:
-        # XXX What's going on here?
+        # ftp://ftp.fox-toolkit.org/pub/fasthalffloatconversion.pdf
+        # 1) Sign bit is shifted and masked;
+        # 2) Exponent (5 bits) is masked and bias-correction subtracted; result shifted and masked;
+        # 3) Mantissa (10 bits) is shifted and masked;
+        # Result is assembled by or-ing those 3.
+        # This ignores rounding and doesn't handle zero, inf, nan or subnormals.
         return ((f >> 16) & 0x8000) | \
                 ((((f & 0x7f800000) - 0x38000000) >> 13) & 0x7c00) | \
                 ((f >> 13) & 0x03ff)
