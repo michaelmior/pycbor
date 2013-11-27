@@ -21,6 +21,7 @@ setup(
     author='Michael Mior',
     author_email='michael.mior@gmail.com',
     url='https://github.com/michaelmior/pycbor',
+    download_url='https://github.com/michaelmior/pycbor/archive/v0.1.tar.gz',
 
     cmdclass={'test': PyTest},
 
