@@ -23,4 +23,13 @@ setup(
     url='https://github.com/michaelmior/pycbor',
 
     cmdclass={'test': PyTest},
+
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
+        'Programming Language :: Python :: 3',
+        'Operating System :: OS Independent',
+        'Topic :: Software Development :: Libraries',
+    ],
 )
