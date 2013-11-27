@@ -16,7 +16,7 @@ class PyTest(Command):
 setup(
     name='pycbor',
     packages=['pycbor'],
-    version=0.1,
+    version='0.1',
     description='Encoding/decoding library for RFC 7049',
     author='Michael Mior',
     author_email='michael.mior@gmail.com',
