@@ -12,7 +12,3 @@ There are probably some ways in which pycbor isn't strictly compliant, but it mo
 
     >>> pycbor.decode(b'\x83\x01\x02\x03')
     [1, 2, 3]
-
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/michaelmior/pycbor/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
-
